@@ -2,12 +2,12 @@
   "name": "sie-scrapper",
   "version": "0.0.1",
   "description": "",
-  "main": "main.js",
+  "main": "src/main.js",
   "scripts": {
-    "start": "node main.js"
+    "start": "node src/main.js"
   },
   "author": "Thibault Massu",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "puppeteer": "^5.5.0"
   },
