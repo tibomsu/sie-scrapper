@@ -1,0 +1,17 @@
+{
+  "name": "sie-scrapper",
+  "version": "0.0.1",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "author": "Thibault Massu",
+  "license": "ISC",
+  "dependencies": {
+    "puppeteer": "^5.5.0"
+  },
+  "devDependencies": {
+    "eslint": "^7.16.0"
+  }
+}
