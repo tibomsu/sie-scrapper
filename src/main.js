@@ -3,125 +3,106 @@ const puppeteer = require('puppeteer')
 
 const START_PAGE = 'https://lannuaire.service-public.fr/navigation/sie'
 
-let browser
-
-/**
- * @param {string} url 
- * @return {puppeteer.Page}
- */
-const createPage = async(url) => {
-    const result = await browser.newPage()
-    await result.goto(url, {waitUntil : 'domcontentloaded'})
-    return result
-}
-
-/**
- * @param {puppeteer.Page} page
- * @return {boolean} 
- */
-const hasNextPage = async (page) => {
-    let result =  await page.$('ul.pagination li.next')
-    return result !== null
-}
-
 /**
  * 
  * @param {puppeteer.Page} page
- * @returns {puppeteer.Page} 
- */
-const goToNextPage = async page => {
-    const nextPageUrl = await page.$eval('ul.pagination li.next a', (link) => {
-        return link.href
-    })
-    await page.goto(nextPageUrl, {waitUntil : 'domcontentloaded'})
-
-    return page
-}
-
-/**
- * 
- * @param {puppeteer.Page} page
- * @return {Array.<object>} 
+ * @return {Promise<object>} 
  */
 const getSIEData = async (page) => {
-    let result = {}
+    let taxService = {}
 
-    result.name = await page.$eval('h1#contentTitle', (element) =>  element.textContent)
+    taxService.name = await page.$eval('h1#contentTitle', (element) =>  element.textContent)
 
     try {
-        result.email = await page.$eval('#contentContactEmail span[itemprop="email"] a', (element) => element.textContent)
+        taxService.email = await page.$eval('#contentContactEmail span[itemprop="email"] a', (element) => element.textContent)
     } catch (e) {
         if (e.message.includes('failed to find element matching selector')) {
-            result.email = null
+            taxService.email = null
         } else {
             throw e
         }
     }
-    result.phone = await page.$eval('#contentPhone_1', (element) => element.textContent)
+    taxService.phone = await page.$eval('#contentPhone_1', (element) => element.textContent)
 
-    result.address = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="streetAddress"]', (element) => element.textContent)
-    result.city = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="addressLocality"]', (element) => element.textContent)
-    result.postal_code = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="postalCode"]', (element) => element.textContent)
+    taxService.address = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="streetAddress"]', (element) => element.textContent)
+    taxService.city = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="addressLocality"]', (element) => element.textContent)
+    taxService.postal_code = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="postalCode"]', (element) => element.textContent)
 
-    result.full_address = `${result.address}, ${result.postal_code}, ${result.city}`
+    taxService.full_address = `${taxService.address}, ${taxService.postal_code}, ${taxService.city}`
 
-    return result
-
-}
-
-const waitFor = (duration) => {
-    return new Promise(resolve => {
-        setTimeout(resolve, duration)
-    })
+    return taxService
 }
 
 /**
  * @param {puppeteer.Page} page
- * @return {Array.<string>}
+ * @return {Promise<Set<object>>}
  */
-const listSIEOnPage = async (page) => {
-    return await page.$$eval('ul.list-orga li a', (links) => {
-        return links.map(link => link.href)
-    })
+const listTaxServices = async(page) => {
+    const taxServicesUrls = await listTaxServicesUrls(page)
+
+    let taxServices = new Set()
+
+    for(const url of taxServicesUrls) {
+        await page.goto(url, {waitUntil: 'domcontentloaded'})
+
+        const data = await getSIEData(page)
+        data.url = url
+
+        console.log(data.name)
+
+        taxServices.add(data)
+    }
+
+    return taxServices
+}
+
+/**
+ * @param {puppeteer.Page} page
+ * @return {Promise<Set<string>>} 
+ */
+const listTaxServicesUrls = async(page) => {
+    await page.goto(START_PAGE, {waitUntil: 'domcontentloaded'})
+    let shouldContinue = true
+
+    let urls = new Set()
+    while(shouldContinue) {
+        const newUrls = await page.$$eval('ul.list-orga li a', (links) => {
+            return links.map(link => link.href)
+        })
+        newUrls.forEach(url => {
+            urls.add(url)
+        })
+
+        shouldContinue = (await page.$('ul.pagination li.next')) !== null
+
+        if (shouldContinue) {
+            const nextUrl = await page.$eval('ul.pagination li.next a', (link) => {
+                return link.href
+            })
+            await page.goto(nextUrl, {waitUntil: 'domcontentloaded'})
+        }
+    }
+
+    return urls
 }
 
 (async() => {
-    browser = await puppeteer.launch()
-    let mainPage = await createPage(START_PAGE)
+    const browser = await puppeteer.launch()
+    const page = await browser.newPage()
 
-    let isDone = false
+    page.setRequestInterception(true)
 
-    let result = []
-    while (!isDone) {
-        const links = await listSIEOnPage(mainPage)
-
-        for (let i = 0; i < links.length; i++) {
-            const link = links[i]
-
-            console.log(link)
-
-            const siePage = await createPage(link)
-            const sieData = await getSIEData(siePage)
-            siePage.close()
-
-            console.log(sieData)
-            await waitFor(2000)
-
-            result.push(sieData)
+    page.on('request', (request) => {
+        if (request.resourceType() === 'document') {
+            return request.continue()
         }
-
-        isDone = !await hasNextPage(mainPage)
-
-        if (!isDone) {
-            mainPage = await goToNextPage(mainPage)
-        }
-
-    }
-    
-    const json = JSON.stringify(result)
-    fs.writeFile('./sie.json', json, 'utf8', function(err){
-        if(err){ 
-            console.log(err) 
-        }
+        return request.abort()
     })
+
+    const taxServices = await listTaxServices(page)
+
+    await page.close()
+    await browser.close()
+
+    fs.writeFile('./sie.json', JSON.stringify(Array.from(taxServices)), 'utf8', () => {})
 })()
