@@ -4,7 +4,7 @@
   "description": "",
   "main": "src/main.js",
   "scripts": {
-    "start": "node src/main.js"
+    "list": "node src/main.js"
   },
   "author": "Thibault Massu",
   "license": "MIT",
