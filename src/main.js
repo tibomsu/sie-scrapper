@@ -11,10 +11,10 @@ const START_PAGE = 'https://lannuaire.service-public.fr/navigation/sie'
 const getSIEData = async (page) => {
     let taxService = {}
 
-    taxService.name = await page.$eval('h1#contentTitle', (element) =>  element.textContent)
+    taxService.name = await page.$eval('h1#contentTitle', (element) =>  element.textContent.trim())
 
     try {
-        taxService.email = await page.$eval('#contentContactEmail span[itemprop="email"] a', (element) => element.textContent)
+        taxService.email = await page.$eval('#contentContactEmail span[itemprop="email"] a', (element) => element.textContent.trim())
     } catch (e) {
         if (e.message.includes('failed to find element matching selector')) {
             taxService.email = null
@@ -22,11 +22,11 @@ const getSIEData = async (page) => {
             throw e
         }
     }
-    taxService.phone = await page.$eval('#contentPhone_1', (element) => element.textContent)
+    taxService.phone = await page.$eval('#contentPhone_1', (element) => element.textContent.trim())
 
-    taxService.address = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="streetAddress"]', (element) => element.textContent)
-    taxService.city = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="addressLocality"]', (element) => element.textContent)
-    taxService.postal_code = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="postalCode"]', (element) => element.textContent)
+    taxService.address = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="streetAddress"]', (element) => element.textContent.trim())
+    taxService.city = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="addressLocality"]', (element) => element.textContent.trim())
+    taxService.postal_code = await page.$eval('article div[itemtype="http://schema.org/PostalAddress"] span[itemprop="postalCode"]', (element) => element.textContent.trim())
 
     taxService.full_address = `${taxService.address}, ${taxService.postal_code}, ${taxService.city}`
 
